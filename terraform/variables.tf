@@ -24,8 +24,8 @@ variable "tags" {
   description = "Tags to apply to all Terraform-managed resources."
   type        = map(string)
   default = {
-    project     = "openshift-sno"
-    managed-by  = "terraform"
-    phase       = "phase1"
+    project    = "openshift-sno"
+    managed-by = "terraform"
+    phase      = "phase1"
   }
 }

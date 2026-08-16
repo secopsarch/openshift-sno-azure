@@ -15,7 +15,7 @@ output "dns_name_servers" {
 
 output "ns_delegation_instructions" {
   description = "Human-readable reminder for NS delegation."
-  value = <<-EOT
+  value       = <<-EOT
     Add the following NS records to your parent zone (at your registrar or parent DNS zone):
 
     Zone: ${var.dns_zone_name}
