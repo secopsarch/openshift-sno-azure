@@ -1,0 +1,40 @@
+# OpenShift installation artifacts — NEVER COMMIT
+openshift/install-config.yaml
+openshift/install-config.yaml.bak
+openshift/auth/
+openshift/*.ign
+openshift/.openshift_install.log
+openshift/.openshift_install_state.json
+openshift/bootstrap.ign
+openshift/master.ign
+openshift/worker.ign
+openshift/metadata.json
+
+# Terraform — sensitive and local
+terraform/terraform.tfvars
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/.terraform.tfstate.lock.info
+
+# Azure credentials cached by openshift-install
+osServicePrincipal.json
+
+# SSH private keys — never commit
+id_rsa
+id_ed25519
+*.pem
+*.key
+
+# Environment files with secrets
+.env
+.env.local
+secrets/
+
+# OS/editor noise
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/

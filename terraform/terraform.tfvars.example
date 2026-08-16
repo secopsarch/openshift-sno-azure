@@ -1,0 +1,27 @@
+# Copy this file to terraform.tfvars and fill in your real values.
+# terraform.tfvars is gitignored and must never be committed.
+
+# Your Azure subscription ID
+# Get it with: az account show --query id -o tsv
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Azure region for the DNS resource group
+# Must match the region you plan to use for the OpenShift cluster
+azure_region = "eastus2"
+
+# Name of the resource group that will contain the DNS zone
+# This value must match baseDomainResourceGroupName in install-config.yaml
+dns_resource_group_name = "sno-dns-rg"
+
+# The DNS zone to create in Azure
+# Replace labX with your lab number (e.g. lab1, lab2)
+# This becomes baseDomain in install-config.yaml
+dns_zone_name = "ocp.lab1.arunkube.org"
+
+# Optional: override default tags
+# tags = {
+#   project    = "openshift-sno"
+#   managed-by = "terraform"
+#   phase      = "phase1"
+#   owner      = "yourname"
+# }

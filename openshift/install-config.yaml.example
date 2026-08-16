@@ -1,0 +1,75 @@
+# OpenShift SNO install-config.yaml example for Azure IPI
+#
+# DO NOT USE THIS FILE DIRECTLY.
+# Generate the real install-config.yaml using:
+#   ./scripts/02-create-install-config.sh
+#
+# The real install-config.yaml:
+#   - contains your pull secret and SSH key (sensitive)
+#   - is consumed and deleted by openshift-install during installation
+#   - is gitignored and must never be committed
+#
+# Field reference: https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_azure/installation-config-parameters-azure
+
+apiVersion: v1
+
+# The base domain must match the Azure DNS zone created by Terraform.
+# Replace labX with your lab number (e.g. lab1).
+baseDomain: ocp.lab1.arunkube.org
+
+metadata:
+  # Cluster name. Combined with baseDomain to form the cluster FQDN:
+  #   api.sno.ocp.lab1.arunkube.org
+  #   *.apps.sno.ocp.lab1.arunkube.org
+  # Restrictions: do not use 'windows', 'microsoft', or start with 'login'.
+  name: sno
+
+# SNO: exactly 1 control plane replica.
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  platform:
+    azure:
+      type: Standard_D8s_v3        # 8 vCPU, 32 GB RAM, Premium SSD
+      osDisk:
+        diskSizeGB: 128            # Override the 1024 GB default to save cost.
+        diskType: premium_LRS      # Required: must be premium for OpenShift.
+  replicas: 1                      # SNO: must be 1.
+
+# SNO: exactly 0 compute replicas.
+# Setting replicas: 0 makes the control plane node schedulable for workloads.
+compute:
+- hyperthreading: Enabled
+  name: worker
+  platform:
+    azure:
+      type: Standard_D4s_v3        # Not used (replicas: 0), but field is required.
+  replicas: 0                      # SNO: must be 0.
+
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  # OVNKubernetes is REQUIRED for SNO. OpenShiftSDN is not supported.
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+
+platform:
+  azure:
+    # Resource group containing the Azure DNS zone (created by Terraform).
+    # Must match dns_resource_group_name in terraform.tfvars.
+    baseDomainResourceGroupName: sno-dns-rg
+
+    # Azure region. Must match where you have Standard_D8s_v3 quota.
+    region: eastus2
+
+# Pull secret from https://console.redhat.com/openshift/install/pull-secret
+# NEVER commit the real pull secret. The script injects it from $PULL_SECRET.
+pullSecret: 'PLACEHOLDER - injected by 02-create-install-config.sh'
+
+# SSH public key for RHCOS node access (troubleshooting only).
+# NEVER commit the private key. The script reads from $SSH_PUBLIC_KEY_PATH.
+sshKey: 'PLACEHOLDER - injected by 02-create-install-config.sh'
