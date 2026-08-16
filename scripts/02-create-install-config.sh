@@ -32,7 +32,11 @@ echo "========================================"
 CLUSTER_NAME="${CLUSTER_NAME:-sno}"
 BASE_DOMAIN="${BASE_DOMAIN:-ocp.lab1.arunkube.org}"
 AZURE_REGION="${AZURE_REGION:-eastus2}"
-CONTROL_PLANE_VM="${CONTROL_PLANE_VM:-Standard_D8s_v3}"
+# Standard_D8s_v3 is NotAvailableForSubscription in this environment.
+# Standard_D8s_v7 (Intel, Dsv7 family): unrestricted, 8 vCPU, 32 GB, Premium SSD.
+# Dsv7 quota: 25 vCPU — sufficient for bootstrap (8) + SNO CP (8) = 16 peak.
+CONTROL_PLANE_VM="${CONTROL_PLANE_VM:-Standard_D8s_v7}"
+DEFAULT_MACHINE_VM="${DEFAULT_MACHINE_VM:-Standard_D8s_v7}"
 CONTROL_PLANE_DISK_GB="${CONTROL_PLANE_DISK_GB:-128}"
 DNS_RG="${DNS_RESOURCE_GROUP:-sno-dns-rg}"
 
@@ -99,7 +103,7 @@ compute:
   name: worker
   platform:
     azure:
-      type: Standard_D4s_v3
+      type: ${CONTROL_PLANE_VM}
   replicas: 0
 networking:
   clusterNetwork:
@@ -114,6 +118,8 @@ platform:
   azure:
     baseDomainResourceGroupName: ${DNS_RG}
     region: ${AZURE_REGION}
+    defaultMachinePlatform:
+      type: ${DEFAULT_MACHINE_VM}
 pullSecret: '${PULL_SECRET}'
 sshKey: |
   ${SSH_PUBLIC_KEY}

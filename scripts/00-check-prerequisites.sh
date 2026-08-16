@@ -59,18 +59,24 @@ echo "[ openshift-install ]"
 if command -v openshift-install &>/dev/null; then
   OI_VERSION=$(openshift-install version 2>/dev/null | head -1 | awk '{print $2}' || echo "unknown")
   pass "openshift-install found — ${OI_VERSION}"
-  # Check it's 4.22.x
-  if echo "${OI_VERSION}" | grep -q "^4\.22\."; then
-    info "Version matches target OCP 4.22"
-  elif echo "${OI_VERSION}" | grep -qE "^4\.[2-9][0-9]|^[5-9]\."; then
-    warn "openshift-install version ${OI_VERSION} — expected 4.22.x. Mismatched versions can cause issues."
+  # Check it's OCP 4.20.x (not OKD)
+  if echo "${OI_VERSION}" | grep -q "okd\|scos\|OKD"; then
+    fail "openshift-install is an OKD build (${OI_VERSION}) — must replace with Red Hat OCP 4.20.x"
+    info "Replace with:"
+    info "  curl -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.20/openshift-install-linux.tar.gz \\"
+    info "    -o /tmp/ocp-install.tar.gz"
+    info "  sudo tar -xzf /tmp/ocp-install.tar.gz -C /usr/local/bin/ openshift-install"
+  elif echo "${OI_VERSION}" | grep -q "^4\.20\."; then
+    info "Version matches target OCP 4.20"
   else
-    warn "openshift-install version ${OI_VERSION} — could not confirm 4.22.x"
+    warn "openshift-install version ${OI_VERSION} — expected OCP 4.20.x. Mismatched versions can cause issues."
   fi
 else
   fail "openshift-install not found"
-  info "Install with:"
-  info "  curl -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.22/openshift-install-linux.tar.gz | tar -xz -C /usr/local/bin/ openshift-install"
+  info "Install OCP 4.20.x with:"
+  info "  curl -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.20/openshift-install-linux.tar.gz \\"
+  info "    -o /tmp/ocp-install.tar.gz"
+  info "  sudo tar -xzf /tmp/ocp-install.tar.gz -C /usr/local/bin/ openshift-install"
 fi
 
 # --- oc ---
@@ -78,11 +84,19 @@ echo ""
 echo "[ oc (OpenShift CLI) ]"
 if command -v oc &>/dev/null; then
   OC_VERSION=$(oc version --client 2>/dev/null | grep "Client Version" | awk '{print $3}' || echo "unknown")
-  pass "oc found — ${OC_VERSION}"
+  if echo "${OC_VERSION}" | grep -qi "okd\|scos"; then
+    fail "oc is an OKD build (${OC_VERSION}) — must replace with Red Hat OCP 4.20.x oc"
+    info "Replace with:"
+    info "  curl -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.20/openshift-client-linux.tar.gz \\"
+    info "    -o /tmp/ocp-client.tar.gz && sudo tar -xzf /tmp/ocp-client.tar.gz -C /usr/local/bin/ oc kubectl"
+  else
+    pass "oc found — ${OC_VERSION}"
+  fi
 else
   fail "oc not found"
-  info "Install with:"
-  info "  curl -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.22/openshift-client-linux.tar.gz | tar -xz -C /usr/local/bin/ oc"
+  info "Install OCP 4.20.x oc with:"
+  info "  curl -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.20/openshift-client-linux.tar.gz \\"
+  info "    -o /tmp/ocp-client.tar.gz && sudo tar -xzf /tmp/ocp-client.tar.gz -C /usr/local/bin/ oc kubectl"
 fi
 
 # --- jq ---
