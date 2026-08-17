@@ -2,14 +2,43 @@
 # 99-cleanup.sh
 # Safely destroy OpenShift SNO cluster and optionally the DNS zone.
 #
-# This script REQUIRES explicit confirmation before running any destructive command.
-# It will NOT blindly destroy resources without showing you what it will touch first.
+# Usage:
+#   ./scripts/99-cleanup.sh                  # interactive; keeps sno-dns-rg
+#   ./scripts/99-cleanup.sh --destroy-dns    # also run terraform destroy on DNS zone
+#   ./scripts/99-cleanup.sh --yes            # skip confirmation prompts (use with care)
+#
+# This script REQUIRES explicit confirmation before running any destructive command
+# unless --yes is passed. It will NOT blindly destroy resources without showing
+# what it will touch first.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 INSTALL_DIR="${REPO_ROOT}/openshift"
+
+DESTROY_DNS=false
+AUTO_YES=false
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--destroy-dns] [--yes]
+
+  --destroy-dns   Also destroy Terraform-managed DNS zone (sno-dns-rg).
+                  Default: keep DNS zone for faster Phase 2 redeploy.
+  --yes           Skip interactive confirmation prompts.
+  -h, --help      Show this help.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --destroy-dns) DESTROY_DNS=true; shift ;;
+    --yes)         AUTO_YES=true; shift ;;
+    -h|--help)     usage; exit 0 ;;
+    *)             echo "Unknown option: $1" >&2; usage; exit 1 ;;
+  esac
+done
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -102,9 +131,18 @@ echo ""
 echo "  This does NOT destroy (managed by Terraform):"
 echo "    - DNS zone: $(cat "${REPO_ROOT}/terraform/terraform.tfvars" 2>/dev/null | grep dns_zone_name | awk -F= '{print $2}' | tr -d ' "' || echo "see terraform/terraform.tfvars")"
 echo "    - DNS resource group: sno-dns-rg"
+if [[ "${DESTROY_DNS}" == "true" ]]; then
+  echo ""
+  echo "  --destroy-dns set: DNS zone and sno-dns-rg will also be destroyed after cluster teardown."
+fi
 echo ""
 
-read -rp "  Type 'yes' to confirm cluster destruction: " CONFIRM
+if [[ "${AUTO_YES}" == "true" ]]; then
+  CONFIRM="yes"
+  info "Auto-confirmed cluster destruction (--yes)"
+else
+  read -rp "  Type 'yes' to confirm cluster destruction: " CONFIRM
+fi
 if [[ "${CONFIRM}" != "yes" ]]; then
   echo "Aborted. No changes made."
   exit 0
@@ -226,31 +264,87 @@ fi
 # Explicit note: no installer cache remains
 ok "Installer directory reset — next create will have no cached state"
 
-# --- Offer to destroy DNS zone ---
-section "Optional: destroy DNS zone (Terraform)"
-echo ""
-echo "  The Terraform-managed DNS zone (sno-dns-rg) was NOT destroyed."
-echo "  This is intentional — keeping the zone allows Phase 2 (reproducibility)"
-echo "  to redeploy without re-delegating NS records."
-echo ""
-echo "  To destroy the DNS zone and resource group, run:"
-echo "    cd ${REPO_ROOT}/terraform && terraform destroy"
-echo ""
+# --- Destroy DNS zone (optional) ---
+section "DNS zone (Terraform)"
 
-read -rp "  Destroy DNS zone now? (yes/no): " DESTROY_DNS
-if [[ "${DESTROY_DNS}" == "yes" ]]; then
+if [[ "${DESTROY_DNS}" == "true" ]]; then
   if [[ -d "${REPO_ROOT}/terraform" ]] && [[ -f "${REPO_ROOT}/terraform/terraform.tfstate" ]]; then
     echo ""
-    echo "  Running: terraform destroy"
+    echo "  Running: terraform destroy (--destroy-dns)"
     cd "${REPO_ROOT}/terraform"
-    terraform destroy
+    if [[ "${AUTO_YES}" == "true" ]]; then
+      terraform destroy -auto-approve
+    else
+      terraform destroy
+    fi
     ok "DNS zone destroyed"
   else
     warn "No Terraform state found — DNS zone may not exist or was not managed by this Terraform"
     info "Check manually: az network dns zone list -o table"
+    # Fallback: delete RG if it still exists
+    if az group show --name sno-dns-rg &>/dev/null; then
+      warn "Deleting sno-dns-rg manually"
+      az group delete --name sno-dns-rg --yes --no-wait
+    fi
   fi
 else
-  info "DNS zone preserved. Useful for Phase 2 reproducibility testing."
+  echo ""
+  echo "  The Terraform-managed DNS zone (sno-dns-rg) was NOT destroyed."
+  echo "  This is intentional — keeping the zone allows Phase 2 (reproducibility)"
+  echo "  to redeploy without re-delegating NS records."
+  echo ""
+  echo "  To destroy the DNS zone on the next run:"
+  echo "    ./scripts/99-cleanup.sh --destroy-dns"
+  echo "  Or manually:"
+  echo "    cd ${REPO_ROOT}/terraform && terraform destroy"
+  echo ""
+
+  if [[ "${AUTO_YES}" == "true" ]]; then
+    info "DNS zone preserved (--yes without --destroy-dns)"
+  else
+    read -rp "  Destroy DNS zone now? (yes/no): " DESTROY_DNS_PROMPT
+    if [[ "${DESTROY_DNS_PROMPT}" == "yes" ]]; then
+      if [[ -d "${REPO_ROOT}/terraform" ]] && [[ -f "${REPO_ROOT}/terraform/terraform.tfstate" ]]; then
+        echo ""
+        echo "  Running: terraform destroy"
+        cd "${REPO_ROOT}/terraform"
+        terraform destroy
+        ok "DNS zone destroyed"
+      else
+        warn "No Terraform state found — check Azure portal manually"
+      fi
+    else
+      info "DNS zone preserved. Useful for Phase 2 reproducibility testing."
+    fi
+  fi
+fi
+
+# --- Post-cleanup verification ---
+section "Post-cleanup verification"
+
+SNO_RGS=$(az group list --query "[?contains(name, 'sno')].name" -o tsv 2>/dev/null || true)
+SNO_PIPS=$(az network public-ip list --query "[?contains(name, 'sno')].name" -o tsv 2>/dev/null || true)
+SNO_LBS=$(az network lb list --query "[?contains(name, 'sno')].name" -o tsv 2>/dev/null || true)
+
+if [[ -z "${SNO_RGS}" ]]; then
+  ok "No resource groups containing 'sno' remain"
+else
+  warn "Resource groups still present:"
+  echo "${SNO_RGS}" | while read -r rg; do info "  ${rg}"; done
+fi
+
+if [[ -z "${SNO_PIPS}" ]]; then
+  ok "No orphaned public IPs containing 'sno'"
+else
+  warn "Orphaned public IPs:"
+  echo "${SNO_PIPS}" | while read -r pip; do info "  ${pip}"; done
+fi
+
+if [[ -z "${SNO_LBS}" ]]; then
+  ok "No orphaned load balancers containing 'sno'"
+else
+  warn "Orphaned load balancers:"
+  echo "${SNO_LBS}" | while read -r lb; do info "  ${lb}"; done
 fi
 
 # --- Final summary ---

@@ -23,14 +23,27 @@ on the next install.
 Use the cleanup script:
 
 ```bash
+# Keep DNS zone (default — faster Phase 2 redeploy)
 ./scripts/99-cleanup.sh
+
+# Destroy cluster AND Terraform DNS zone (sno-dns-rg)
+./scripts/99-cleanup.sh --destroy-dns
+
+# Non-interactive (automation / CI)
+./scripts/99-cleanup.sh --destroy-dns --yes
 ```
 
 The script will:
 1. Display the target subscription, resource group, cluster name, and region
-2. Require you to type `yes` explicitly before running any destructive command
+2. Require you to type `yes` explicitly before running any destructive command (unless `--yes`)
 3. Run `openshift-install destroy cluster --dir openshift/`
-4. Ask separately whether to also destroy the DNS zone (Terraform)
+4. Force-delete any leftover resource groups whose name contains `sno` except `sno-dns-rg`
+5. Destroy the DNS zone if `--destroy-dns` is set, or prompt separately (default: keep zone)
+6. Verify no `sno*` resource groups, public IPs, or load balancers remain
+
+> **Warning:** Any resource group whose name contains the substring `sno` (except
+> `sno-dns-rg` until `--destroy-dns`) is deleted, including manually created RGs
+> like `sno-test123`. Use a different naming prefix for resources you want to keep.
 
 ---
 

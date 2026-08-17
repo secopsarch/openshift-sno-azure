@@ -4,10 +4,15 @@
 
 | Phase | Status |
 |---|---|
-| Phase 1 — SNO | 🔧 In progress |
-| Phase 2 — Reproducibility | Not started |
+| Phase 1 — SNO | ✅ Complete (OCP **4.20.32**, torn down Aug 2026) |
+| Phase 2 — Reproducibility | Cleanup verified; redeploy not yet run |
 | Phase 3 — Compact cluster | Not started |
 | Phase 4 — 6-node cluster | Not started |
+
+**Live cluster (Aug 2026):** torn down — cleanup verified, no `sno*` Azure resources remain.
+
+See [docs/future-labs.md](docs/future-labs.md) for bastion, Multus/secondary NIC,
+Virtualization, and changing `ocplab1` → `ocplab2`.
 
 ---
 
@@ -90,11 +95,11 @@ No overlap. No Terraform state contains installer-managed resources.
 
 | Parameter | Value |
 |---|---|
-| OpenShift version | 4.22 |
+| OpenShift version | **4.20.32** |
 | Cluster name | `sno` (configurable) |
-| Base domain | `ocplabX.arunkube.org` (configurable) |
+| Base domain | `ocplab1.arunkube.org` (configurable — see [docs/future-labs.md](docs/future-labs.md)) |
 | Azure region | `eastus2` (configurable) |
-| Control plane VM | `Standard_D8s_v3` |
+| Control plane VM | `Standard_D8s_v7` |
 | Control plane replicas | 1 |
 | Worker replicas | 0 |
 | OS disk | 128 GB `Premium_LRS` |
@@ -103,18 +108,18 @@ No overlap. No Terraform state contains installer-managed resources.
 
 ### Deliverables
 
-- [ ] Azure prerequisites validated (quota, SKU availability, roles)
-- [ ] DNS zone created (Terraform) and delegation verified
-- [ ] `install-config.yaml` generated (no secrets committed)
-- [ ] OpenShift installation completed
-- [ ] SNO node is `Ready`
-- [ ] ClusterVersion is `Available`
-- [ ] ClusterOperators are healthy (Available=True, Progressing=False, Degraded=False)
-- [ ] API endpoint reachable
-- [ ] Console reachable
-- [ ] Test application deployed (nginx)
-- [ ] Test application reachable externally
-- [ ] Cleanup procedure verified
+- [x] Azure prerequisites validated (quota, SKU availability, roles)
+- [x] DNS zone created (Terraform) and delegation verified
+- [x] `install-config.yaml` generated (no secrets committed)
+- [x] OpenShift installation completed
+- [x] SNO node is `Ready`
+- [x] ClusterVersion is `Available`
+- [x] ClusterOperators are healthy (Available=True, Progressing=False, Degraded=False)
+- [x] API endpoint reachable
+- [x] Console reachable
+- [x] Test application deployed (nginx)
+- [x] Test application reachable externally
+- [x] Cleanup procedure verified (Phase 2 — destroy + DNS zone removal)
 
 ### Installation workflow
 
