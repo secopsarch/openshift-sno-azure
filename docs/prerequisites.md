@@ -168,7 +168,7 @@ Any replacement must support Premium Storage (the `s` suffix in DSv3/DSv4/DSv5).
 
 ## 3. DNS prerequisites
 
-A public Azure DNS zone for `ocp.labX.arunkube.org` must exist and NS
+A public Azure DNS zone for `ocplabX.arunkube.org` must exist and NS
 delegation must be complete before running `openshift-install`.
 
 See [docs/dns.md](dns.md) for the full DNS setup procedure.
@@ -177,7 +177,7 @@ Quick check:
 
 ```bash
 # After terraform apply and NS delegation:
-dig NS ocp.lab1.arunkube.org +short
+dig NS ocplab1.arunkube.org +short
 # Should return the four Azure DNS name servers
 ```
 

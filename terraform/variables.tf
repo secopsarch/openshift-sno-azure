@@ -16,7 +16,7 @@ variable "dns_resource_group_name" {
 }
 
 variable "dns_zone_name" {
-  description = "The public DNS zone name to create in Azure. This becomes the baseDomain in install-config.yaml. Example: ocp.lab1.arunkube.org"
+  description = "The public DNS zone name to create in Azure. This becomes the baseDomain in install-config.yaml. Example: ocplab1.arunkube.org"
   type        = string
 }
 

@@ -19,14 +19,14 @@ worker nodes.
                     │  Azure DNS  │
                     │  Public     │
                     │  Zone       │
-                    │  ocp.labX   │
+                    │  ocplabX   │
                     │  .arunkube  │
                     │  .org       │
                     └──────┬──────┘
                            │
               ┌────────────┴────────────┐
               │                         │
-    api.sno.ocp.labX.*       *.apps.sno.ocp.labX.*
+    api.sno.ocplabX.*       *.apps.sno.ocplabX.*
               │                         │
               └────────────┬────────────┘
                            │
@@ -64,7 +64,7 @@ worker nodes.
 | Resource | Name | Purpose |
 |---|---|---|
 | Resource group | `sno-dns-rg` | Container for DNS zone |
-| Azure DNS zone | `ocp.lab1.arunkube.org` | Public DNS for cluster |
+| Azure DNS zone | `ocplab1.arunkube.org` | Public DNS for cluster |
 
 Terraform state contains only these two resources. The DNS zone persists
 across cluster create/destroy cycles (Phase 2 reproducibility testing).
@@ -94,7 +94,7 @@ and `destroy cluster`. **Terraform must never manage these.**
 
 | Resource | Where | Purpose |
 |---|---|---|
-| NS delegation records | Your registrar or parent DNS zone | Delegate `ocp.labX.arunkube.org` to Azure DNS |
+| NS delegation records | Your registrar or parent DNS zone | Delegate `ocplabX.arunkube.org` to Azure DNS |
 | Pull secret | `console.redhat.com` | OpenShift image pull authorization |
 | SSH key pair | `~/.ssh/` | Node access |
 | Azure service principal | Azure AD | Installer authentication |
@@ -116,18 +116,18 @@ and `destroy cluster`. **Terraform must never manage these.**
 ## DNS record structure
 
 ```
-Zone: ocp.lab1.arunkube.org
+Zone: ocplab1.arunkube.org
   (Terraform-managed, Azure public DNS zone)
 
 Records created by installer:
-  api.sno.ocp.lab1.arunkube.org.        A  → External LB public IP
-  *.apps.sno.ocp.lab1.arunkube.org.     A  → Default LB public IP
+  api.sno.ocplab1.arunkube.org.        A  → External LB public IP
+  *.apps.sno.ocplab1.arunkube.org.     A  → Default LB public IP
 
 Resulting FQDNs:
-  API endpoint:    https://api.sno.ocp.lab1.arunkube.org:6443
-  Console:         https://console-openshift-console.apps.sno.ocp.lab1.arunkube.org
-  OAuth:           https://oauth-openshift.apps.sno.ocp.lab1.arunkube.org
-  Any Route:       https://<route-name>.apps.sno.ocp.lab1.arunkube.org
+  API endpoint:    https://api.sno.ocplab1.arunkube.org:6443
+  Console:         https://console-openshift-console.apps.sno.ocplab1.arunkube.org
+  OAuth:           https://oauth-openshift.apps.sno.ocplab1.arunkube.org
+  Any Route:       https://<route-name>.apps.sno.ocplab1.arunkube.org
 ```
 
 ---

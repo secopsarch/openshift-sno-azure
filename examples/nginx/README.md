@@ -14,7 +14,7 @@ OpenShift: workload → service → ingress → DNS → internet.
 After deploying, the nginx default page is accessible at:
 
 ```
-http://nginx-demo.apps.sno.ocp.lab1.arunkube.org
+http://nginx-demo.apps.sno.ocplab1.arunkube.org
 ```
 
 (Replace with your actual cluster domain.)
@@ -84,9 +84,9 @@ nginx-demo   ClusterIP   172.30.45.123   <none>        80/TCP    2m
 
 $ oc get route -n sno-demo
 NAME         HOST/PORT                                       PATH   SERVICES     PORT   TERMINATION   WILDCARD
-nginx-demo   nginx-demo.apps.sno.ocp.lab1.arunkube.org             nginx-demo   http                 None
+nginx-demo   nginx-demo.apps.sno.ocplab1.arunkube.org             nginx-demo   http                 None
 
-$ curl -I http://nginx-demo.apps.sno.ocp.lab1.arunkube.org
+$ curl -I http://nginx-demo.apps.sno.ocplab1.arunkube.org
 HTTP/1.1 200 OK
 Server: nginx/1.27.x
 ...

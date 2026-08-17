@@ -9,7 +9,7 @@ output "dns_resource_group_name" {
 }
 
 output "dns_name_servers" {
-  description = "Azure DNS name servers assigned to the zone. Add these as NS records in your parent domain (labX.arunkube.org) to delegate ocp.labX.arunkube.org to Azure DNS."
+  description = "Azure DNS name servers assigned to the zone. Add these as NS records in your parent domain (arunkube.org at Cloudflare) to delegate ocplabX.arunkube.org to Azure DNS."
   value       = azurerm_dns_zone.base.name_servers
 }
 

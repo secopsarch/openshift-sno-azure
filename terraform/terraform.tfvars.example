@@ -16,7 +16,7 @@ dns_resource_group_name = "sno-dns-rg"
 # The DNS zone to create in Azure
 # Replace labX with your lab number (e.g. lab1, lab2)
 # This becomes baseDomain in install-config.yaml
-dns_zone_name = "ocp.lab1.arunkube.org"
+dns_zone_name = "ocplab1.arunkube.org"
 
 # Optional: override default tags
 # tags = {

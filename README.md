@@ -30,7 +30,7 @@ on the single node.
 ```
 Internet
    |
-Azure DNS (public zone: ocp.labX.arunkube.org)
+Azure DNS (public zone: ocplabX.arunkube.org)
    |         \
 api.sno.*   *.apps.sno.*
    |              |
@@ -121,19 +121,19 @@ oc apply -f deployment.yaml -f service.yaml -f route.yaml
 
 ## DNS setup
 
-The cluster requires a public Azure DNS zone for `ocp.labX.arunkube.org`
+The cluster requires a public Azure DNS zone for `ocplabX.arunkube.org`
 (replace `labX` with your lab number, e.g. `lab1`).
 
 Terraform creates:
 - Resource group: `sno-dns-rg`
-- Azure DNS zone: `ocp.lab1.arunkube.org`
+- Azure DNS zone: `ocplab1.arunkube.org`
 
 After `terraform apply`, add the four NS records Terraform outputs to your
-parent domain (`labX.arunkube.org`) at your DNS registrar.
+parent domain (`arunkube.org`) at your DNS registrar.
 
 The installer then automatically creates:
-- `api.sno.ocp.lab1.arunkube.org` → API load balancer IP
-- `*.apps.sno.ocp.lab1.arunkube.org` → Ingress load balancer IP
+- `api.sno.ocplab1.arunkube.org` → API load balancer IP
+- `*.apps.sno.ocplab1.arunkube.org` → Ingress load balancer IP
 
 See [docs/dns.md](docs/dns.md) for detailed DNS setup instructions.
 

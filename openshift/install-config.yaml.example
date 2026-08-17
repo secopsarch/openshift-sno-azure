@@ -24,12 +24,12 @@ apiVersion: v1
 
 # The base domain must match the Azure DNS zone created by Terraform.
 # Replace labX with your lab number (e.g. lab1).
-baseDomain: ocp.lab1.arunkube.org
+baseDomain: ocplab1.arunkube.org
 
 metadata:
   # Cluster name. Combined with baseDomain to form the cluster FQDN:
-  #   api.sno.ocp.lab1.arunkube.org
-  #   *.apps.sno.ocp.lab1.arunkube.org
+  #   api.sno.ocplab1.arunkube.org
+  #   *.apps.sno.ocplab1.arunkube.org
   # Restrictions: do not use 'windows', 'microsoft', or start with 'login'.
   name: sno
 

@@ -85,12 +85,12 @@ If you change the VM SKU or region, regenerate `install-config.yaml` from scratc
 **Check:**
 ```bash
 # Is the NS delegation propagated?
-dig NS ocp.lab1.arunkube.org @8.8.8.8 +short
+dig NS ocplab1.arunkube.org @8.8.8.8 +short
 
 # Is the zone accessible?
 az network dns zone show \
   --resource-group sno-dns-rg \
-  --name ocp.lab1.arunkube.org
+  --name ocplab1.arunkube.org
 
 # Does the service principal have access to the DNS RG?
 az role assignment list \
@@ -102,7 +102,7 @@ az role assignment list \
 **Fix:**
 1. Ensure all four NS records are added to the parent zone
 2. Wait for propagation (5–30 min typical; up to 48h at registrar)
-3. Verify with `dig @8.8.8.8 NS ocp.lab1.arunkube.org` before retrying
+3. Verify with `dig @8.8.8.8 NS ocplab1.arunkube.org` before retrying
 
 ### Service principal permissions insufficient
 

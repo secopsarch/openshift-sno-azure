@@ -65,7 +65,7 @@ TERRAFORM OWNS                   OPENSHIFT-INSTALL OWNS
 ─────────────────────────        ──────────────────────────────────────────
 Resource group: sno-dns-rg       Resource group: sno-<random>-rg
 Azure public DNS zone            VNet + 2 subnets (control-plane + compute)
-  ocp.lab1.arunkube.org          NSGs: controlplane (6443), node (80/443)
+  ocplab1.arunkube.org          NSGs: controlplane (6443), node (80/443)
                                  LBs: internal (6443+22623), external (6443),
                                       default (80/443)
                                  Bootstrap VM: Standard_D8s_v3 (temporary)
@@ -92,14 +92,14 @@ No overlap. No Terraform state contains installer-managed resources.
 |---|---|
 | OpenShift version | 4.22 |
 | Cluster name | `sno` (configurable) |
-| Base domain | `ocp.labX.arunkube.org` (configurable) |
+| Base domain | `ocplabX.arunkube.org` (configurable) |
 | Azure region | `eastus2` (configurable) |
 | Control plane VM | `Standard_D8s_v3` |
 | Control plane replicas | 1 |
 | Worker replicas | 0 |
 | OS disk | 128 GB `Premium_LRS` |
 | Network plugin | `OVNKubernetes` |
-| DNS zone | `ocp.lab1.arunkube.org` (Azure public DNS) |
+| DNS zone | `ocplab1.arunkube.org` (Azure public DNS) |
 
 ### Deliverables
 

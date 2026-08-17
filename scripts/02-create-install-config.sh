@@ -24,13 +24,19 @@ echo " $(date)"
 echo "========================================"
 
 # --- Required environment variables ---
-: "${PULL_SECRET:?ERROR: PULL_SECRET environment variable is not set. Get it from https://console.redhat.com/openshift/install/pull-secret}"
+: "${PULL_SECRET:?ERROR: PULL_SECRET environment variable is not set. Set it to the JSON content or a path to the file. Get it from https://console.redhat.com/openshift/install/pull-secret}"
 : "${SSH_PUBLIC_KEY_PATH:=${HOME}/.ssh/id_ed25519.pub}"
+
+# If PULL_SECRET looks like a file path, read the file content
+if [[ -f "${PULL_SECRET}" ]]; then
+  PULL_SECRET=$(cat "${PULL_SECRET}")
+  ok "PULL_SECRET loaded from file"
+fi
 
 # --- Configurable cluster parameters ---
 # Override any of these with environment variables before running this script.
 CLUSTER_NAME="${CLUSTER_NAME:-sno}"
-BASE_DOMAIN="${BASE_DOMAIN:-ocp.lab1.arunkube.org}"
+BASE_DOMAIN="${BASE_DOMAIN:-ocplab1.arunkube.org}"
 AZURE_REGION="${AZURE_REGION:-eastus2}"
 # Standard_D8s_v3 is NotAvailableForSubscription in this environment.
 # Standard_D8s_v7 (Intel, Dsv7 family): unrestricted, 8 vCPU, 32 GB, Premium SSD.

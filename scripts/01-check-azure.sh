@@ -167,7 +167,7 @@ DNS_RG="${DNS_RG_NAME:-sno-dns-rg}"
 
 if [[ -z "${DNS_ZONE}" ]]; then
   warn "DNS_ZONE_NAME not set — skipping DNS zone check"
-  info "Set it with: export DNS_ZONE_NAME=ocp.lab1.arunkube.org"
+  info "Set it with: export DNS_ZONE_NAME=ocplab1.arunkube.org"
 else
   if az network dns zone show \
       --resource-group "${DNS_RG}" \

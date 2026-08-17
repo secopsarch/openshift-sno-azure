@@ -73,7 +73,7 @@ az group list \
 # Check DNS zone is clean (A records should be gone)
 az network dns record-set list \
   --resource-group sno-dns-rg \
-  --zone-name ocp.lab1.arunkube.org \
+  --zone-name ocplab1.arunkube.org \
   -o table
 ```
 
@@ -109,7 +109,7 @@ terraform destroy
 ```
 
 This removes:
-- Azure DNS zone `ocp.lab1.arunkube.org`
+- Azure DNS zone `ocplab1.arunkube.org`
 - Resource group `sno-dns-rg`
 
 > **Note for Phase 2:** If you are planning to redeploy (reproducibility testing),
@@ -166,7 +166,7 @@ az network lb list --query "[?contains(name, 'sno')]" -o table
 # DNS zone is clean (only SOA + NS records remain)
 az network dns record-set list \
   --resource-group sno-dns-rg \
-  --zone-name ocp.lab1.arunkube.org \
+  --zone-name ocplab1.arunkube.org \
   -o table
 
 # Local installation artifacts

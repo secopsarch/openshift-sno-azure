@@ -10,8 +10,8 @@ A records in this zone during installation.
 
 | FQDN | Record type | Resolves to | Created by |
 |---|---|---|---|
-| `api.sno.ocp.lab1.arunkube.org` | A | API load balancer public IP | `openshift-install` |
-| `*.apps.sno.ocp.lab1.arunkube.org` | A (wildcard) | Ingress load balancer public IP | `openshift-install` |
+| `api.sno.ocplab1.arunkube.org` | A | API load balancer public IP | `openshift-install` |
+| `*.apps.sno.ocplab1.arunkube.org` | A (wildcard) | Ingress load balancer public IP | `openshift-install` |
 
 You do **not** create these records manually. The installer creates them
 automatically in the Azure DNS zone, provided:
@@ -24,15 +24,16 @@ automatically in the Azure DNS zone, provided:
 ## This project's DNS structure
 
 ```
-arunkube.org             ← root domain (at your registrar)
-  └── labX.arunkube.org ← lab subdomain (at your registrar or Azure DNS)
-        └── ocp.labX.arunkube.org  ← TERRAFORM creates this Azure DNS zone
-              └── sno.ocp.labX.arunkube.org ← cluster subdomain
-                    ├── api.sno...   ← installer creates this A record
-                    └── *.apps.sno... ← installer creates this wildcard A record
+arunkube.org                  ← root domain (at Cloudflare)
+  └── ocplabX.arunkube.org   ← TERRAFORM creates this Azure DNS zone
+                                 Cloudflare delegates NS directly to Azure DNS
+        └── sno.ocplabX.arunkube.org ← cluster subdomain (name = cluster metadata.name)
+              ├── api.sno...   ← installer creates this A record
+              └── *.apps.sno... ← installer creates this wildcard A record
 ```
 
-Replace `labX` with your lab number (e.g. `lab1`, `lab2`).
+Replace `labX` with your lab number (e.g. `lab1`, `lab2`).  
+This project uses `ocplab1.arunkube.org` as the concrete example.
 
 ---
 
@@ -41,7 +42,7 @@ Replace `labX` with your lab number (e.g. `lab1`, `lab2`).
 `terraform apply` in `terraform/` creates:
 
 1. Resource group `sno-dns-rg` in `eastus2`
-2. Azure public DNS zone `ocp.lab1.arunkube.org`
+2. Azure public DNS zone `ocplab1.arunkube.org`
 
 After apply, Terraform outputs the four name servers Azure assigns to the zone:
 
@@ -61,32 +62,32 @@ examples. Use the actual Terraform output values.
 
 ## Step 2: Add NS delegation records
 
-Add four NS records in the **parent zone** (`labX.arunkube.org`) pointing to
+Add four NS records in the **parent zone** (`arunkube.org`) pointing to
 the Azure DNS name servers from the Terraform output.
 
-### If `labX.arunkube.org` is at a registrar (e.g. Namecheap, GoDaddy, Route 53)
+### If `arunkube.org` is at Cloudflare (this project's setup)
 
-Add these four NS records to your registrar's DNS management panel:
+In the Cloudflare dashboard for `arunkube.org`, add four NS records:
 
 ```
 Type: NS
-Host: ocp.lab1        (or ocp.lab1.arunkube.org. — depends on registrar)
-Value: ns1-01.azure-dns.com.
-TTL: 3600
+Name: ocplab1          (subdomain only — Cloudflare fills in .arunkube.org)
+Value: ns1-05.azure-dns.com.
+TTL: Auto
 
-(repeat for all four name servers)
+(repeat for all four Azure nameservers from terraform output)
 ```
 
-### If `labX.arunkube.org` is itself in Azure DNS
+### If `arunkube.org` is itself in Azure DNS
 
 ```bash
 # Get the Azure DNS zone name servers
 NS_SERVERS=$(terraform -chdir=terraform/ output -json dns_name_servers | jq -r '.[]')
 
 # Add NS records to the parent zone
-RG="<resource group containing labX.arunkube.org>"
-PARENT_ZONE="lab1.arunkube.org"
-SUBDOMAIN="ocp"
+RG="<resource group containing arunkube.org>"
+PARENT_ZONE="arunkube.org"
+SUBDOMAIN="ocplab1"
 
 for ns in $NS_SERVERS; do
   az network dns record-set ns add-record \
@@ -106,16 +107,16 @@ up to 48 hours for some registrars).
 
 ```bash
 # Check NS records resolve correctly
-dig NS ocp.lab1.arunkube.org +short
+dig NS ocplab1.arunkube.org +short
 
 # Expected: the four Azure DNS name servers
 # If empty or wrong, NS delegation is not complete — do NOT proceed with install
 
 # Verify the zone is authoritative (no error response)
-dig SOA ocp.lab1.arunkube.org
+dig SOA ocplab1.arunkube.org
 
 # Cross-check from an external DNS resolver
-dig @8.8.8.8 NS ocp.lab1.arunkube.org +short
+dig @8.8.8.8 NS ocplab1.arunkube.org +short
 ```
 
 The installer will fail if NS delegation is not working before `create cluster` runs.
@@ -129,7 +130,7 @@ A records automatically. Verify them:
 
 ```bash
 CLUSTER_NAME="sno"
-BASE_DOMAIN="ocp.lab1.arunkube.org"
+BASE_DOMAIN="ocplab1.arunkube.org"
 
 # API record
 dig A "api.${CLUSTER_NAME}.${BASE_DOMAIN}" +short
@@ -173,12 +174,12 @@ create the A records yourself after the installer provisions the load balancers
 
 ```bash
 # Check if NS delegation is correct
-dig NS ocp.lab1.arunkube.org @8.8.8.8
+dig NS ocplab1.arunkube.org @8.8.8.8
 
 # Check if the zone exists in Azure
 az network dns zone show \
   --resource-group sno-dns-rg \
-  --name ocp.lab1.arunkube.org
+  --name ocplab1.arunkube.org
 
 # Check service principal has access to the DNS RG
 az role assignment list \
@@ -192,7 +193,7 @@ az role assignment list \
 The `*.apps.*` A record may not have propagated yet. Check:
 
 ```bash
-dig A "console-openshift-console.apps.sno.ocp.lab1.arunkube.org" +short
+dig A "console-openshift-console.apps.sno.ocplab1.arunkube.org" +short
 ```
 
 If the record is missing, check that the installer completed successfully
