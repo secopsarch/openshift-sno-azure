@@ -102,7 +102,7 @@ controlPlane:
       type: ${CONTROL_PLANE_VM}
       osDisk:
         diskSizeGB: ${CONTROL_PLANE_DISK_GB}
-        diskType: premium_LRS
+        diskType: Premium_LRS
   replicas: 1
 compute:
 - hyperthreading: Enabled
