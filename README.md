@@ -3,6 +3,8 @@
 Single Node OpenShift (SNO) **4.20** deployed on Microsoft Azure using the official
 Red Hat Installer-Provisioned Infrastructure (IPI) method.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 > **Important distinction:** This repository deploys SNO directly on Azure using the
 > supported Azure IPI workflow. It does NOT use the Assisted Installer, discovery
 > ISO, bare-metal workflows, ARO, nested virtualization, or UPI ARM templates.
