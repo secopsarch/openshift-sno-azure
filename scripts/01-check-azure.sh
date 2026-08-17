@@ -26,8 +26,15 @@ section() { echo ""; echo -e "${BLUE}[ $1 ]${NC}"; }
 
 # Configurable defaults — override via environment variables
 AZURE_REGION="${AZURE_REGION:-eastus2}"
-VM_SKU="${VM_SKU:-Standard_D8s_v3}"
+VM_SKU="${VM_SKU:-Standard_D8s_v7}"
 MIN_VCPU_REQUIRED=16  # bootstrap(8) + control-plane(8) during SNO installation
+
+# Derive the quota family name from the VM SKU.
+# Standard_D8s_v7 → "Standard Dsv7 Family vCPUs"
+# Standard_D8s_v3 → "Standard DSv3 Family vCPUs"
+# Override with QUOTA_FAMILY if the auto-derived name is wrong for your SKU.
+_SKU_SUFFIX="${VM_SKU##*_v}"  # e.g. "7" from Standard_D8s_v7
+QUOTA_FAMILY="${QUOTA_FAMILY:-Standard Dsv${_SKU_SUFFIX} Family vCPUs}"
 
 echo "========================================"
 echo " Azure preflight check"
@@ -101,7 +108,7 @@ else
     if echo "${RESTRICTION_DETAILS}" | grep -q "NotAvailableForSubscription"; then
       fail "${VM_SKU} is restricted in ${AZURE_REGION} for this subscription (${RESTRICTION_DETAILS})"
       info "Try an alternative region or request quota increase in Azure portal"
-      info "Alternative SKUs: Standard_D8s_v4, Standard_D8s_v5, Standard_D8as_v4"
+      info "Alternative SKUs: Standard_D8s_v7, Standard_D8as_v7, Standard_D8s_v5"
     else
       warn "${VM_SKU} has restrictions in ${AZURE_REGION}: ${RESTRICTION_DETAILS}"
     fi
@@ -109,31 +116,33 @@ else
 fi
 
 # --- vCPU quota ---
-section "vCPU quota: Standard DSv3 Family in ${AZURE_REGION}"
+section "vCPU quota: ${QUOTA_FAMILY} in ${AZURE_REGION}"
 
 QUOTA_INFO=$(az vm list-usage \
   --location "${AZURE_REGION}" \
-  --query "[?name.localizedValue=='Standard DSv3 Family vCPUs']" \
+  --query "[?name.localizedValue=='${QUOTA_FAMILY}']" \
   -o json 2>/dev/null || echo "[]")
 
 if [[ "${QUOTA_INFO}" == "[]" ]] || [[ -z "${QUOTA_INFO}" ]]; then
-  warn "Could not retrieve Standard DSv3 vCPU quota — check manually in Azure portal"
+  warn "Could not retrieve '${QUOTA_FAMILY}' quota — check manually in Azure portal"
+  info "Override the family name with: export QUOTA_FAMILY='<exact name from portal>'"
 else
   QUOTA_CURRENT=$(echo "${QUOTA_INFO}" | jq -r '.[0].currentValue // 0')
   QUOTA_LIMIT=$(echo "${QUOTA_INFO}" | jq -r '.[0].limit // 0')
   QUOTA_AVAILABLE=$((QUOTA_LIMIT - QUOTA_CURRENT))
 
+  info "Quota family : ${QUOTA_FAMILY}"
   info "Quota limit  : ${QUOTA_LIMIT} vCPU"
   info "Current usage: ${QUOTA_CURRENT} vCPU"
   info "Available    : ${QUOTA_AVAILABLE} vCPU"
   info "Required     : ${MIN_VCPU_REQUIRED} vCPU (during SNO installation)"
 
   if [[ "${QUOTA_AVAILABLE}" -ge "${MIN_VCPU_REQUIRED}" ]]; then
-    pass "Sufficient DSv3 vCPU quota: ${QUOTA_AVAILABLE} available, ${MIN_VCPU_REQUIRED} required"
+    pass "Sufficient vCPU quota: ${QUOTA_AVAILABLE} available, ${MIN_VCPU_REQUIRED} required"
   else
-    fail "Insufficient DSv3 vCPU quota: ${QUOTA_AVAILABLE} available, ${MIN_VCPU_REQUIRED} required"
+    fail "Insufficient vCPU quota: ${QUOTA_AVAILABLE} available, ${MIN_VCPU_REQUIRED} required"
     info "Request increase at: Azure portal → Subscriptions → Usage + quotas"
-    info "Filter: 'Standard DSv3' → Request increase → set to at least 20"
+    info "Filter: '${QUOTA_FAMILY}' → Request increase → set to at least 20"
   fi
 fi
 
