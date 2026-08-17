@@ -80,6 +80,10 @@ platform:
     # NotAvailableForSubscription in this environment.
     # Setting defaultMachinePlatform.type applies to both bootstrap and any
     # machines not overridden by controlPlane/compute platform stanzas.
+    #
+    # Do NOT set identity.type: None for this lab. Default managed identity is
+    # required so future ACR pull/mirror integration can use Azure identity.
+    # Requires the installer SP to have User Access Administrator.
     defaultMachinePlatform:
       type: Standard_D8s_v7
 

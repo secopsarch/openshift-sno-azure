@@ -153,31 +153,78 @@ else
   done
 fi
 
+# --- Archive installer artifacts BEFORE wipe (never commit) ---
+section "Archiving installer artifacts before cleanup"
+
+if [[ -x "${SCRIPT_DIR}/06-archive-run.sh" ]]; then
+  "${SCRIPT_DIR}/06-archive-run.sh" --status destroyed --upload || \
+    "${SCRIPT_DIR}/06-archive-run.sh" --status destroyed || \
+    warn "Archive step failed — continuing with cleanup"
+else
+  warn "06-archive-run.sh not found — skipping archive"
+fi
+
+# --- Force-delete any leftover cluster RGs (no cache / dependency leftovers) ---
+section "Force-deleting leftover cluster resource groups"
+
+# Keep Terraform DNS RG; delete every other sno-* / cluster RG
+LEFTOVER_RGS=$(az group list \
+  --query "[?contains(name, 'sno') && name!='sno-dns-rg'].name" \
+  -o tsv 2>/dev/null || echo "")
+
+if [[ -n "${LEFTOVER_RGS}" ]]; then
+  echo "${LEFTOVER_RGS}" | while read -r rg; do
+    [[ -z "${rg}" ]] && continue
+    warn "Deleting leftover resource group: ${rg}"
+    az group delete --name "${rg}" --yes --no-wait
+    ok "Delete started: ${rg}"
+  done
+  info "Waiting for resource group deletions to finish..."
+  for rg in ${LEFTOVER_RGS}; do
+    while az group show --name "${rg}" &>/dev/null; do
+      sleep 10
+    done
+    ok "Deleted: ${rg}"
+  done
+else
+  ok "No leftover cluster resource groups"
+fi
+
 # --- Clean up local files ---
 section "Cleaning up local installation artifacts"
 
-FILES_TO_REMOVE=(
-  "${INSTALL_DIR}/auth"
-  "${INSTALL_DIR}/*.ign"
-  "${INSTALL_DIR}/.openshift_install.log"
-  "${INSTALL_DIR}/.openshift_install_state.json"
-  "${INSTALL_DIR}/metadata.json"
+# Wipe ALL installer-generated state so the next create starts from a clean slate.
+# Keep only: README.md, install-config.yaml.example, install-config.yaml.bak
+KEEP_FILES=(
+  "README.md"
+  "install-config.yaml.example"
+  "install-config.yaml.bak"
 )
 
-for f in "${FILES_TO_REMOVE[@]}"; do
-  # Expand globs safely
-  for match in $f; do
-    if [[ -e "${match}" ]]; then
-      rm -rf "${match}"
-      ok "Removed: ${match}"
+shopt -s nullglob dotglob
+for path in "${INSTALL_DIR}"/*; do
+  base=$(basename "${path}")
+  keep=false
+  for k in "${KEEP_FILES[@]}"; do
+    if [[ "${base}" == "${k}" ]]; then
+      keep=true
+      break
     fi
   done
+  if [[ "${keep}" == "false" ]]; then
+    rm -rf "${path}"
+    ok "Removed: ${path}"
+  fi
 done
+shopt -u nullglob dotglob
 
 # Keep install-config.yaml.bak (useful for replay in Phase 2)
 if [[ -f "${INSTALL_DIR}/install-config.yaml.bak" ]]; then
   info "Kept: ${INSTALL_DIR}/install-config.yaml.bak (useful for Phase 2 replay)"
 fi
+
+# Explicit note: no installer cache remains
+ok "Installer directory reset — next create will have no cached state"
 
 # --- Offer to destroy DNS zone ---
 section "Optional: destroy DNS zone (Terraform)"
@@ -217,7 +264,13 @@ echo "    az group list --query \"[?contains(name, 'sno')]\" -o table"
 echo "    az network public-ip list --query \"[?contains(name, 'sno')]\" -o table"
 echo "    az network lb list --query \"[?contains(name, 'sno')]\" -o table"
 echo ""
-echo "  To redeploy (Phase 2):"
-echo "    cp ${INSTALL_DIR}/install-config.yaml.bak ${INSTALL_DIR}/install-config.yaml"
-echo "    ./scripts/03-install-sno.sh"
+echo "  To redeploy (Phase 2) — always start from a clean slate:"
+echo "    1. Confirm no leftover RGs: az group list -o table | grep sno"
+echo "    2. Regenerate install-config (do not reuse stale installer state):"
+echo "         export PULL_SECRET=/home/devops/pull-secret.txt"
+echo "         ./scripts/02-create-install-config.sh"
+echo "    3. ./scripts/03-install-sno.sh"
+echo ""
+echo "  Future ACR work: keep default managed identity (do not set identity.type: None)."
+echo "  Installer SP must retain Contributor + User Access Administrator."
 echo ""

@@ -208,6 +208,13 @@ The following files are NEVER committed and are in `.gitignore`:
 - `openshift/install-config.yaml` (contains pull secret and SSH key)
 - `openshift/auth/` (contains kubeconfig and kubeadmin password)
 - `openshift/*.ign` (ignition files)
+- `openshift/terraform.platform.auto.tfvars.json` and other installer tfvars
+- `openshift/openshift/`, `.clusterapi_output/`, installer logs/state
+- `archives/runs/` and `archives/INDEX.json` (local lab reproduction history)
+- `terraform/terraform.tfstate` (local DNS state — cheapest option)
+
+Lab run artifacts are archived locally by `./scripts/06-archive-run.sh` (also
+invoked from install/cleanup). See `archives/README.md`.
 - `terraform/terraform.tfvars` (contains real variable values)
 - `terraform/.terraform/` (provider binaries)
 - `terraform/terraform.tfstate*` (may contain sensitive data)

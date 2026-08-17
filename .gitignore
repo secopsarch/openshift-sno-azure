@@ -1,7 +1,11 @@
 # OpenShift installation artifacts — NEVER COMMIT
+# Keep only: openshift/README.md, openshift/install-config.yaml.example
 openshift/install-config.yaml
 openshift/install-config.yaml.bak
 openshift/auth/
+openshift/tls/
+openshift/.clusterapi_output/
+openshift/openshift/
 openshift/*.ign
 openshift/.openshift_install.log
 openshift/.openshift_install_state.json
@@ -9,6 +13,16 @@ openshift/bootstrap.ign
 openshift/master.ign
 openshift/worker.ign
 openshift/metadata.json
+openshift/terraform.tfvars.json
+openshift/terraform.platform.auto.tfvars.json
+openshift/*.tfvars.json
+openshift/*.auto.tfvars.json
+
+# Lab run archives — stay in repo tree locally, NEVER push
+archives/runs/
+archives/INDEX.json
+archives/*.tar.gz
+archives/*.tgz
 
 # Terraform — sensitive and local
 terraform/terraform.tfvars
@@ -17,6 +31,9 @@ terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/.terraform.tfstate.lock.info
+terraform/tfplan
+terraform/*.tfplan
+terraform/backend.hcl
 
 # Azure credentials cached by openshift-install
 osServicePrincipal.json

@@ -100,8 +100,8 @@ echo ""
 echo -e "${YELLOW}  WARNING: This command will create billable Azure resources.${NC}"
 echo ""
 echo "  Resources that will be created:"
-echo "    - Bootstrap VM:     Standard_D8s_v3 (~\$0.38/hr, ~40-90 min)"
-echo "    - Control plane VM: Standard_D8s_v3 (~\$0.38/hr, ongoing)"
+echo "    - Bootstrap VM:     Standard_D8s_v7 (~\$0.38/hr, temporary)"
+echo "    - Control plane VM: Standard_D8s_v7 (~\$0.38/hr, ongoing)"
 echo "    - OS disks:         Premium_LRS (~\$0.02/hr, ongoing)"
 echo "    - Load balancers:   3x Standard (~\$0.03/hr each, ongoing)"
 echo "    - Public IPs:       3x Standard (~\$0.005/hr each)"
@@ -168,6 +168,11 @@ if [[ "${INSTALL_EXIT}" -eq 0 ]]; then
   echo "    export KUBECONFIG=${INSTALL_DIR}/auth/kubeconfig"
   echo "    oc whoami"
   echo ""
+  # Archive successful run (local + optional Azure blob on existing SA)
+  if [[ -x "${SCRIPT_DIR}/06-archive-run.sh" ]]; then
+    "${SCRIPT_DIR}/06-archive-run.sh" --status success --upload || \
+      "${SCRIPT_DIR}/06-archive-run.sh" --status success || true
+  fi
   echo "Next step: ./scripts/05-validate-cluster.sh"
 else
   echo -e "${RED}========================================"
@@ -177,12 +182,18 @@ else
   echo "  Review the installation log:"
   echo "    cat ${INSTALL_DIR}/.openshift_install.log | grep -i 'error\|fatal\|failed'"
   echo ""
+  # Archive failed attempt BEFORE any wipe so we keep terraform.platform.auto.tfvars.json etc.
+  if [[ -x "${SCRIPT_DIR}/06-archive-run.sh" ]]; then
+    "${SCRIPT_DIR}/06-archive-run.sh" --status failed --upload || \
+      "${SCRIPT_DIR}/06-archive-run.sh" --status failed || true
+  fi
   echo "  Recovery procedure:"
-  echo "    1. ./scripts/99-cleanup.sh  — destroy partially-created resources"
+  echo "    1. ./scripts/99-cleanup.sh  — archives then destroys partial resources"
   echo "    2. Diagnose the root cause (see docs/troubleshooting.md)"
-  echo "    3. cp ${BACKUP_FILE} ${INSTALL_DIR}/install-config.yaml"
+  echo "    3. ./scripts/02-create-install-config.sh  — regenerate install-config"
   echo "    4. ./scripts/03-install-sno.sh  — retry"
   echo ""
   echo "  See docs/troubleshooting.md for common failure modes."
+  echo "  See archives/INDEX.json for how many times this lab has been reproduced."
   exit "${INSTALL_EXIT}"
 fi
