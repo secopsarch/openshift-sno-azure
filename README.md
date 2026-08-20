@@ -1,7 +1,9 @@
 # OpenShift SNO on Azure
 
-Single Node OpenShift (SNO) 4.22 deployed on Microsoft Azure using the official
+Single Node OpenShift (SNO) **4.20** deployed on Microsoft Azure using the official
 Red Hat Installer-Provisioned Infrastructure (IPI) method.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > **Important distinction:** This repository deploys SNO directly on Azure using the
 > supported Azure IPI workflow. It does NOT use the Assisted Installer, discovery
@@ -18,6 +20,7 @@ Red Hat Installer-Provisioned Infrastructure (IPI) method.
 - [DNS setup](#dns-setup)
 - [Cost](#cost)
 - [Phases](#phases)
+- [Future labs](#future-labs)
 - [Cleanup](#cleanup)
 
 ---
@@ -41,9 +44,9 @@ api.sno.*   *.apps.sno.*
    +----+----+
    |         |
 Bootstrap   SNO Control Plane
-(temporary) Standard_D8s_v3
+(temporary) Standard_D8s_v7
 ~40 min     8 vCPU / 32 GB RAM
-removed     128 GB premium_LRS
+removed     128 GB Premium_LRS
 after       (all roles: master +
 install     worker + etcd + ingress)
 ```
@@ -63,8 +66,8 @@ See [docs/architecture.md](docs/architecture.md) for full resource map.
 |---|---|---|
 | `az` (Azure CLI) | 2.50+ | Azure authentication and quota checks |
 | `terraform` | 1.6+ | DNS zone pre-provisioning |
-| `openshift-install` | 4.22.x | Cluster installation |
-| `oc` | 4.22.x | Post-install cluster management |
+| `openshift-install` | 4.20.x | Cluster installation |
+| `oc` | 4.20.x | Post-install cluster management |
 | `jq` | 1.6+ | JSON parsing in scripts |
 | `curl` | any | Download checks |
 | `ssh` / `ssh-keygen` | any | Key generation |
@@ -146,9 +149,9 @@ resources:
 
 | Resource | Type | Billing |
 |---|---|---|
-| Control plane VM | `Standard_D8s_v3` (8 vCPU / 32 GB) | Per hour while running |
+| Control plane VM | `Standard_D8s_v7` (8 vCPU / 32 GB) | Per hour while running |
 | OS disk | 128 GB `Premium_LRS` | Per hour provisioned |
-| Bootstrap VM | `Standard_D8s_v3` | Per hour during install (~40-90 min), then deleted |
+| Bootstrap VM | `Standard_D8s_v7` | Per hour during install (~40-90 min), then deleted |
 | Bootstrap disk | 100 GB `Premium_LRS` | During install only, then deleted |
 | Load balancers (3) | Azure Standard LB | Per hour + data processed |
 | Public IPs (3) | Standard SKU | Per hour while allocated |
@@ -156,14 +159,14 @@ resources:
 | Storage account | LRS | Per GB stored |
 
 **Approximate ongoing cost after installation (control plane VM only):**
-The `Standard_D8s_v3` in `eastus2` costs approximately $0.38/hour (Pay As You Go,
+The `Standard_D8s_v7` in `eastus2` costs approximately $0.38/hour (Pay As You Go,
 subject to change — verify at [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/)).
 
 **This is not a production cluster.** Destroy it when not in use.
 
 ```bash
-# Destroy everything
-./scripts/99-cleanup.sh
+# Destroy everything (cluster + DNS zone)
+./scripts/99-cleanup.sh --destroy-dns
 ```
 
 OpenShift subscription/licensing requirements are separate from Azure
@@ -176,12 +179,25 @@ lab use. Pull secret from [console.redhat.com](https://console.redhat.com).
 
 | Phase | Goal | Status |
 |---|---|---|
-| **Phase 1 — SNO** | One working SNO cluster on Azure | 🔧 In progress |
-| Phase 2 — Reproducibility | Destroy + redeploy, verify process | Not started |
+| **Phase 1 — SNO** | One working SNO cluster on Azure | ✅ Complete (torn down) |
+| Phase 2 — Reproducibility | Destroy + redeploy, verify process | Cleanup verified |
 | Phase 3 — Compact cluster | 3 control-plane nodes, 0 workers | Not started |
 | Phase 4 — 6-node cluster | 3 control-plane + 3 workers | Not started |
 
 See [PLAN.md](PLAN.md) for phase details.
+
+---
+
+## Future labs
+
+Optional extensions (not required for Phase 1):
+
+- **Bastion VM** — optional jump host on the installer VNet if you need SSH to the node without VPN
+- **Secondary NIC + Multus** — post-install Azure NIC attach for multihomed pod labs
+- **OpenShift Virtualization** — possible on SNO but resource-heavy; better on Phase 3/4
+- **Rename domain** (`ocplab1` → `ocplab2`) — requires destroy + reinstall; one-time checklist
+
+Full validation and procedures: [docs/future-labs.md](docs/future-labs.md).
 
 ---
 
@@ -195,7 +211,7 @@ The cleanup script will:
 1. Display the target subscription, resource group, cluster name, and region
 2. Require explicit typed confirmation before running anything destructive
 3. Run `openshift-install destroy cluster` to remove all installer-created resources
-4. Optionally run `terraform destroy` to remove the DNS zone
+4. Optionally run `terraform destroy` to remove the DNS zone (`--destroy-dns` flag)
 
 See [docs/cleanup.md](docs/cleanup.md) for full cleanup documentation.
 
@@ -208,6 +224,13 @@ The following files are NEVER committed and are in `.gitignore`:
 - `openshift/install-config.yaml` (contains pull secret and SSH key)
 - `openshift/auth/` (contains kubeconfig and kubeadmin password)
 - `openshift/*.ign` (ignition files)
+- `openshift/terraform.platform.auto.tfvars.json` and other installer tfvars
+- `openshift/openshift/`, `.clusterapi_output/`, installer logs/state
+- `archives/runs/` and `archives/INDEX.json` (local lab reproduction history)
+- `terraform/terraform.tfstate` (local DNS state — cheapest option)
+
+Lab run artifacts are archived locally by `./scripts/06-archive-run.sh` (also
+invoked from install/cleanup). See `archives/README.md`.
 - `terraform/terraform.tfvars` (contains real variable values)
 - `terraform/.terraform/` (provider binaries)
 - `terraform/terraform.tfstate*` (may contain sensitive data)
@@ -217,8 +240,8 @@ The following files are NEVER committed and are in `.gitignore`:
 
 ## References
 
-- [OCP 4.22 — Installing on a single node](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_a_single_node/install-sno-installing-sno)
-- [OCP 4.22 — Installing on Azure (IPI)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_azure/installer-provisioned-infrastructure)
-- [OCP 4.22 — Azure account configuration](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_azure/installing-azure-account)
-- [OCP 4.22 — Azure install-config parameters](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_azure/installation-config-parameters-azure)
+- [OCP 4.20 — Installing on a single node](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/installing_on_a_single_node/install-sno-installing-sno)
+- [OCP 4.20 — Installing on Azure (IPI)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/installing_on_azure/installer-provisioned-infrastructure)
+- [OCP 4.20 — Azure account configuration](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/installing_on_azure/installing-azure-account)
+- [OCP 4.20 — Azure install-config parameters](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/installing_on_azure/installation-config-parameters-azure)
 - [Red Hat Hybrid Cloud Console](https://console.redhat.com) — pull secret

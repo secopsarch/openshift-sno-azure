@@ -1,0 +1,14 @@
+# Optional remote Terraform state — uses EXISTING Cloud Shell storage (no new cost).
+#
+# Usage:
+#   cp backend.hcl.example backend.hcl
+#   terraform init -backend-config=backend.hcl -migrate-state
+#
+# Never commit backend.hcl if you customize credentials into it.
+# Prefer Azure AD auth (use_azuread_auth = true) with az login.
+
+resource_group_name  = "cloud-shell-storage-southeastasia"
+storage_account_name = "cs110032003f4f3399f"
+container_name       = "ocp-sno-lab"
+key                  = "terraform/openshift-sno-azure.tfstate"
+use_azuread_auth     = true

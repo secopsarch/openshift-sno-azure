@@ -68,9 +68,10 @@ needs **both** of these roles at subscription scope:
 | `Contributor` | Create and manage Azure resources |
 | `User Access Administrator` | Assign managed identities to VMs during install |
 
-> **Note:** If you set `identity.type: None` in `install-config.yaml`, the
-> `User Access Administrator` role is not required. However, this is an
-> advanced configuration — use the default for Phase 1.
+> **Lab requirement:** Keep the default managed identity (do **not** set
+> `identity.type: None`). This lab will use Azure Container Registry (ACR)
+> later for image mirror/pull. Managed identity + User Access Administrator
+> are required for that path.
 
 ### Create a service principal
 
@@ -122,19 +123,19 @@ Run `./scripts/01-check-azure.sh` to verify.
 
 | Resource | Required (peak install) | Azure default |
 |---|---|---|
-| Standard DSv3 vCPUs | 16 | 20/region |
+| Standard Dsv7 vCPUs | 16 | 25/region (this subscription) |
 | Network load balancers | 3 | 1000/region |
 | Public IP addresses | 3 | 20/region |
 | VNets | 1 | 1000/region |
 | NSGs | 2 | 5000 |
 
-If your quota for Standard DSv3 vCPUs is below 16 in `eastus2`, request an
+If your quota for Standard Dsv7 vCPUs is below 16 in `eastus2`, request an
 increase before installing:
 
 ```bash
-# Check current quota
+# Check current quota (this lab uses Standard_D8s_v7)
 az vm list-usage --location eastus2 \
-  --query "[?name.localizedValue=='Standard DSv3 Family vCPUs']" \
+  --query "[?name.localizedValue=='Standard Dsv7 Family vCPUs']" \
   -o table
 
 # Increase via Azure portal: Subscriptions → Usage + quotas → Request increase
@@ -143,12 +144,11 @@ az vm list-usage --location eastus2 \
 ### Verify VM SKU availability
 
 ```bash
-# Confirm Standard_D8s_v3 is available in eastus2
+# Confirm Standard_D8s_v7 is available in eastus2
 az vm list-skus \
   --location eastus2 \
-  --size Standard_D8s_v3 \
-  --all \
-  --query "[?name=='Standard_D8s_v3'].{Name:name, Tier:tier, Restrictions:restrictions}" \
+  --size Standard_D8s_v7 \
+  --query "[].{Name:name, Restrictions:restrictions}" \
   -o table
 ```
 
@@ -157,12 +157,12 @@ is restricted, choose an equivalent SKU in the same or adjacent region:
 
 | Alternative SKU | vCPU | RAM | Premium SSD |
 |---|---|---|---|
-| `Standard_D8s_v4` | 8 | 32 GB | Yes |
+| `Standard_D8s_v7` | 8 | 32 GB | Yes |
 | `Standard_D8s_v5` | 8 | 32 GB | Yes |
-| `Standard_D8as_v4` | 8 | 32 GB | Yes |
+| `Standard_D8as_v7` | 8 | 32 GB | Yes |
 | `Standard_D8as_v5` | 8 | 32 GB | Yes |
 
-Any replacement must support Premium Storage (the `s` suffix in DSv3/DSv4/DSv5).
+Any replacement must support Premium Storage (the `s` suffix in Dsv5/Dsv7).
 
 ---
 

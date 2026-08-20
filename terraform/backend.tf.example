@@ -1,0 +1,15 @@
+# Optional Azure Blob remote state — EXISTING Cloud Shell storage (no new cost).
+#
+# Default for this lab: keep terraform.tfstate LOCAL (gitignored). That is the
+# cheapest and simplest option.
+#
+# To enable remote state later (after granting yourself Storage Blob Data Contributor
+# on cs110032003f4f3399f):
+#
+#   1. Rename this file to backend.tf (or copy contents)
+#   2. cp backend.hcl.example backend.hcl
+#   3. terraform init -backend-config=backend.hcl -migrate-state
+#
+# terraform {
+#   backend "azurerm" {}
+# }

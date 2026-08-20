@@ -15,6 +15,13 @@ This directory is the installation directory for `openshift-install`.
 | `*.ign` | **NO** | Ignition files — gitignored |
 | `.openshift_install.log` | **NO** | Installer log — gitignored |
 | `.openshift_install_state.json` | **NO** | Installer state — gitignored |
+| `terraform.platform.auto.tfvars.json` | **NO** | Installer-generated — gitignored |
+| `terraform.tfvars.json` | **NO** | Installer-generated — gitignored |
+| `openshift/` (nested) | **NO** | Manifests — gitignored |
+| `.clusterapi_output/` | **NO** | Cluster API output — gitignored |
+
+All of the above are archived under `archives/runs/` (also gitignored) by
+`./scripts/06-archive-run.sh` before cleanup. See `archives/README.md`.
 
 ---
 

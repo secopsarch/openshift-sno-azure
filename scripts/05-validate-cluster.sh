@@ -75,8 +75,8 @@ else
   warn "Node count: ${NODE_COUNT} (expected 1 for SNO)"
 fi
 
-# Check node is Ready
-NOT_READY=$(oc get nodes --no-headers 2>/dev/null | grep -v " Ready" | wc -l | tr -d ' ')
+# Check node is Ready (grep returns 1 when all nodes are Ready — do not use set -e exit)
+NOT_READY=$(oc get nodes --no-headers 2>/dev/null | grep -v " Ready" | wc -l | tr -d ' ' || true)
 if [[ "${NOT_READY}" -eq 0 ]]; then
   pass "All nodes are Ready"
 else

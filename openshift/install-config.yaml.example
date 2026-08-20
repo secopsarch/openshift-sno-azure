@@ -42,7 +42,7 @@ controlPlane:
       type: Standard_D8s_v7        # 8 vCPU, 32 GB RAM, Premium SSD (Dsv7 family)
       osDisk:
         diskSizeGB: 128            # SNO minimum is 120 GB; override the 1024 GB default.
-        diskType: premium_LRS      # Required: must be premium_LRS for OpenShift.
+        diskType: Premium_LRS      # Required: must be Premium_LRS for OpenShift.
   replicas: 1                      # SNO: must be 1.
 
 # SNO: exactly 0 compute replicas.
@@ -80,6 +80,10 @@ platform:
     # NotAvailableForSubscription in this environment.
     # Setting defaultMachinePlatform.type applies to both bootstrap and any
     # machines not overridden by controlPlane/compute platform stanzas.
+    #
+    # Do NOT set identity.type: None for this lab. Default managed identity is
+    # required so future ACR pull/mirror integration can use Azure identity.
+    # Requires the installer SP to have User Access Administrator.
     defaultMachinePlatform:
       type: Standard_D8s_v7
 

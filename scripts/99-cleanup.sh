@@ -2,14 +2,43 @@
 # 99-cleanup.sh
 # Safely destroy OpenShift SNO cluster and optionally the DNS zone.
 #
-# This script REQUIRES explicit confirmation before running any destructive command.
-# It will NOT blindly destroy resources without showing you what it will touch first.
+# Usage:
+#   ./scripts/99-cleanup.sh                  # interactive; keeps sno-dns-rg
+#   ./scripts/99-cleanup.sh --destroy-dns    # also run terraform destroy on DNS zone
+#   ./scripts/99-cleanup.sh --yes            # skip confirmation prompts (use with care)
+#
+# This script REQUIRES explicit confirmation before running any destructive command
+# unless --yes is passed. It will NOT blindly destroy resources without showing
+# what it will touch first.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 INSTALL_DIR="${REPO_ROOT}/openshift"
+
+DESTROY_DNS=false
+AUTO_YES=false
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--destroy-dns] [--yes]
+
+  --destroy-dns   Also destroy Terraform-managed DNS zone (sno-dns-rg).
+                  Default: keep DNS zone for faster Phase 2 redeploy.
+  --yes           Skip interactive confirmation prompts.
+  -h, --help      Show this help.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --destroy-dns) DESTROY_DNS=true; shift ;;
+    --yes)         AUTO_YES=true; shift ;;
+    -h|--help)     usage; exit 0 ;;
+    *)             echo "Unknown option: $1" >&2; usage; exit 1 ;;
+  esac
+done
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -102,9 +131,18 @@ echo ""
 echo "  This does NOT destroy (managed by Terraform):"
 echo "    - DNS zone: $(cat "${REPO_ROOT}/terraform/terraform.tfvars" 2>/dev/null | grep dns_zone_name | awk -F= '{print $2}' | tr -d ' "' || echo "see terraform/terraform.tfvars")"
 echo "    - DNS resource group: sno-dns-rg"
+if [[ "${DESTROY_DNS}" == "true" ]]; then
+  echo ""
+  echo "  --destroy-dns set: DNS zone and sno-dns-rg will also be destroyed after cluster teardown."
+fi
 echo ""
 
-read -rp "  Type 'yes' to confirm cluster destruction: " CONFIRM
+if [[ "${AUTO_YES}" == "true" ]]; then
+  CONFIRM="yes"
+  info "Auto-confirmed cluster destruction (--yes)"
+else
+  read -rp "  Type 'yes' to confirm cluster destruction: " CONFIRM
+fi
 if [[ "${CONFIRM}" != "yes" ]]; then
   echo "Aborted. No changes made."
   exit 0
@@ -153,57 +191,160 @@ else
   done
 fi
 
+# --- Archive installer artifacts BEFORE wipe (never commit) ---
+section "Archiving installer artifacts before cleanup"
+
+if [[ -x "${SCRIPT_DIR}/06-archive-run.sh" ]]; then
+  "${SCRIPT_DIR}/06-archive-run.sh" --status destroyed --upload || \
+    "${SCRIPT_DIR}/06-archive-run.sh" --status destroyed || \
+    warn "Archive step failed — continuing with cleanup"
+else
+  warn "06-archive-run.sh not found — skipping archive"
+fi
+
+# --- Force-delete any leftover cluster RGs (no cache / dependency leftovers) ---
+section "Force-deleting leftover cluster resource groups"
+
+# Keep Terraform DNS RG; delete every other sno-* / cluster RG
+LEFTOVER_RGS=$(az group list \
+  --query "[?contains(name, 'sno') && name!='sno-dns-rg'].name" \
+  -o tsv 2>/dev/null || echo "")
+
+if [[ -n "${LEFTOVER_RGS}" ]]; then
+  echo "${LEFTOVER_RGS}" | while read -r rg; do
+    [[ -z "${rg}" ]] && continue
+    warn "Deleting leftover resource group: ${rg}"
+    az group delete --name "${rg}" --yes --no-wait
+    ok "Delete started: ${rg}"
+  done
+  info "Waiting for resource group deletions to finish..."
+  for rg in ${LEFTOVER_RGS}; do
+    while az group show --name "${rg}" &>/dev/null; do
+      sleep 10
+    done
+    ok "Deleted: ${rg}"
+  done
+else
+  ok "No leftover cluster resource groups"
+fi
+
 # --- Clean up local files ---
 section "Cleaning up local installation artifacts"
 
-FILES_TO_REMOVE=(
-  "${INSTALL_DIR}/auth"
-  "${INSTALL_DIR}/*.ign"
-  "${INSTALL_DIR}/.openshift_install.log"
-  "${INSTALL_DIR}/.openshift_install_state.json"
-  "${INSTALL_DIR}/metadata.json"
+# Wipe ALL installer-generated state so the next create starts from a clean slate.
+# Keep only: README.md, install-config.yaml.example, install-config.yaml.bak
+KEEP_FILES=(
+  "README.md"
+  "install-config.yaml.example"
+  "install-config.yaml.bak"
 )
 
-for f in "${FILES_TO_REMOVE[@]}"; do
-  # Expand globs safely
-  for match in $f; do
-    if [[ -e "${match}" ]]; then
-      rm -rf "${match}"
-      ok "Removed: ${match}"
+shopt -s nullglob dotglob
+for path in "${INSTALL_DIR}"/*; do
+  base=$(basename "${path}")
+  keep=false
+  for k in "${KEEP_FILES[@]}"; do
+    if [[ "${base}" == "${k}" ]]; then
+      keep=true
+      break
     fi
   done
+  if [[ "${keep}" == "false" ]]; then
+    rm -rf "${path}"
+    ok "Removed: ${path}"
+  fi
 done
+shopt -u nullglob dotglob
 
 # Keep install-config.yaml.bak (useful for replay in Phase 2)
 if [[ -f "${INSTALL_DIR}/install-config.yaml.bak" ]]; then
   info "Kept: ${INSTALL_DIR}/install-config.yaml.bak (useful for Phase 2 replay)"
 fi
 
-# --- Offer to destroy DNS zone ---
-section "Optional: destroy DNS zone (Terraform)"
-echo ""
-echo "  The Terraform-managed DNS zone (sno-dns-rg) was NOT destroyed."
-echo "  This is intentional — keeping the zone allows Phase 2 (reproducibility)"
-echo "  to redeploy without re-delegating NS records."
-echo ""
-echo "  To destroy the DNS zone and resource group, run:"
-echo "    cd ${REPO_ROOT}/terraform && terraform destroy"
-echo ""
+# Explicit note: no installer cache remains
+ok "Installer directory reset — next create will have no cached state"
 
-read -rp "  Destroy DNS zone now? (yes/no): " DESTROY_DNS
-if [[ "${DESTROY_DNS}" == "yes" ]]; then
+# --- Destroy DNS zone (optional) ---
+section "DNS zone (Terraform)"
+
+if [[ "${DESTROY_DNS}" == "true" ]]; then
   if [[ -d "${REPO_ROOT}/terraform" ]] && [[ -f "${REPO_ROOT}/terraform/terraform.tfstate" ]]; then
     echo ""
-    echo "  Running: terraform destroy"
+    echo "  Running: terraform destroy (--destroy-dns)"
     cd "${REPO_ROOT}/terraform"
-    terraform destroy
+    if [[ "${AUTO_YES}" == "true" ]]; then
+      terraform destroy -auto-approve
+    else
+      terraform destroy
+    fi
     ok "DNS zone destroyed"
   else
     warn "No Terraform state found — DNS zone may not exist or was not managed by this Terraform"
     info "Check manually: az network dns zone list -o table"
+    # Fallback: delete RG if it still exists
+    if az group show --name sno-dns-rg &>/dev/null; then
+      warn "Deleting sno-dns-rg manually"
+      az group delete --name sno-dns-rg --yes --no-wait
+    fi
   fi
 else
-  info "DNS zone preserved. Useful for Phase 2 reproducibility testing."
+  echo ""
+  echo "  The Terraform-managed DNS zone (sno-dns-rg) was NOT destroyed."
+  echo "  This is intentional — keeping the zone allows Phase 2 (reproducibility)"
+  echo "  to redeploy without re-delegating NS records."
+  echo ""
+  echo "  To destroy the DNS zone on the next run:"
+  echo "    ./scripts/99-cleanup.sh --destroy-dns"
+  echo "  Or manually:"
+  echo "    cd ${REPO_ROOT}/terraform && terraform destroy"
+  echo ""
+
+  if [[ "${AUTO_YES}" == "true" ]]; then
+    info "DNS zone preserved (--yes without --destroy-dns)"
+  else
+    read -rp "  Destroy DNS zone now? (yes/no): " DESTROY_DNS_PROMPT
+    if [[ "${DESTROY_DNS_PROMPT}" == "yes" ]]; then
+      if [[ -d "${REPO_ROOT}/terraform" ]] && [[ -f "${REPO_ROOT}/terraform/terraform.tfstate" ]]; then
+        echo ""
+        echo "  Running: terraform destroy"
+        cd "${REPO_ROOT}/terraform"
+        terraform destroy
+        ok "DNS zone destroyed"
+      else
+        warn "No Terraform state found — check Azure portal manually"
+      fi
+    else
+      info "DNS zone preserved. Useful for Phase 2 reproducibility testing."
+    fi
+  fi
+fi
+
+# --- Post-cleanup verification ---
+section "Post-cleanup verification"
+
+SNO_RGS=$(az group list --query "[?contains(name, 'sno')].name" -o tsv 2>/dev/null || true)
+SNO_PIPS=$(az network public-ip list --query "[?contains(name, 'sno')].name" -o tsv 2>/dev/null || true)
+SNO_LBS=$(az network lb list --query "[?contains(name, 'sno')].name" -o tsv 2>/dev/null || true)
+
+if [[ -z "${SNO_RGS}" ]]; then
+  ok "No resource groups containing 'sno' remain"
+else
+  warn "Resource groups still present:"
+  echo "${SNO_RGS}" | while read -r rg; do info "  ${rg}"; done
+fi
+
+if [[ -z "${SNO_PIPS}" ]]; then
+  ok "No orphaned public IPs containing 'sno'"
+else
+  warn "Orphaned public IPs:"
+  echo "${SNO_PIPS}" | while read -r pip; do info "  ${pip}"; done
+fi
+
+if [[ -z "${SNO_LBS}" ]]; then
+  ok "No orphaned load balancers containing 'sno'"
+else
+  warn "Orphaned load balancers:"
+  echo "${SNO_LBS}" | while read -r lb; do info "  ${lb}"; done
 fi
 
 # --- Final summary ---
@@ -217,7 +358,13 @@ echo "    az group list --query \"[?contains(name, 'sno')]\" -o table"
 echo "    az network public-ip list --query \"[?contains(name, 'sno')]\" -o table"
 echo "    az network lb list --query \"[?contains(name, 'sno')]\" -o table"
 echo ""
-echo "  To redeploy (Phase 2):"
-echo "    cp ${INSTALL_DIR}/install-config.yaml.bak ${INSTALL_DIR}/install-config.yaml"
-echo "    ./scripts/03-install-sno.sh"
+echo "  To redeploy (Phase 2) — always start from a clean slate:"
+echo "    1. Confirm no leftover RGs: az group list -o table | grep sno"
+echo "    2. Regenerate install-config (do not reuse stale installer state):"
+echo "         export PULL_SECRET=/home/devops/pull-secret.txt"
+echo "         ./scripts/02-create-install-config.sh"
+echo "    3. ./scripts/03-install-sno.sh"
+echo ""
+echo "  Future ACR work: keep default managed identity (do not set identity.type: None)."
+echo "  Installer SP must retain Contributor + User Access Administrator."
 echo ""
